@@ -43,9 +43,6 @@ static AppTimer *s_compass_toggle_timer = NULL;
 static bool s_compass_toggle_locked = false;
 static void compass_toggle_unlock(void *context);
 static bool s_compass_calibrating = false;
-static int s_calib_samples[6];
-static int s_calib_index = 0;
-static int s_calib_stable_count = 0;
 static AppTimer *s_calib_timeout = NULL;
 static void calib_timeout_cb(void *context);
 
@@ -304,10 +301,7 @@ static void set_compass_enabled(bool enabled) {
   s_compass_enabled = enabled;
   if (enabled) {
     compass_service_subscribe(compass_heading_handler);
-    // start lightweight calibration tracking
     s_compass_calibrating = true;
-    s_calib_index = 0;
-    s_calib_stable_count = 0;
     if (s_calib_timeout) {
       app_timer_cancel(s_calib_timeout);
     }
@@ -315,7 +309,6 @@ static void set_compass_enabled(bool enabled) {
   } else {
     compass_service_unsubscribe();
     s_heading = 0; // force pointer to default (north)
-    // stop calibration state
     s_compass_calibrating = false;
     if (s_calib_timeout) { app_timer_cancel(s_calib_timeout); s_calib_timeout = NULL; }
   }
@@ -993,11 +986,11 @@ static void draw_major_tick (GContext *ctx, int angle, int length, GColor fill_c
 static void layer_update_proc_compass_icon(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   if (s_compass_calibrating) {
-    // Draw calibration text centered at top
+    // Draw calibration text centered at top with a visible color
     const char *cal_text = "Calibrating...";
     GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
-    GRect text_box = GRect((bounds.size.w/2) - 60, 6, 120, 18);
-    graphics_context_set_fill_color(ctx, settings.TextColor1);
+    GRect text_box = GRect((bounds.size.w / 2) - 60, 6, 120, 18);
+    graphics_context_set_fill_color(ctx, settings.TickColor);
     graphics_draw_text(ctx, cal_text, font, text_box, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
     return;
   }
@@ -1030,29 +1023,33 @@ static void draw_minor_tick(GContext *ctx, GPoint center, GColor border_color) {
 }
 
 static void compass_heading_handler(CompassHeadingData heading_data) {
-  int new_heading = (int)(heading_data.magnetic_heading + 0.5);
-  s_heading = new_heading;
-
-  // If we are tracking calibration progress, collect samples and look for stability
-  if (s_compass_calibrating) {
-    s_calib_samples[s_calib_index % 6] = new_heading;
-    s_calib_index++;
-    if (s_calib_index >= 4) {
-      // check stability across last 4 samples
-      int stable = 1;
-      int base = s_calib_samples[(s_calib_index-1) % 6];
-      for (int i = 1; i < 4; ++i) {
-        int idx = (s_calib_index - 1 - i) % 6;
-        int diff = abs(base - s_calib_samples[idx]);
-        if (diff > 8) { stable = 0; break; }
-      }
-      if (stable) {
-        s_compass_calibrating = false;
-        if (s_calib_timeout) { app_timer_cancel(s_calib_timeout); s_calib_timeout = NULL; }
-        layer_mark_dirty(s_canvas_compass_icon);
-      }
+  if (heading_data.compass_status == CompassStatusCalibrated) {
+    int new_heading = (int)(heading_data.magnetic_heading + 0.5);
+    s_heading = new_heading;
+    if (s_compass_calibrating) {
+      s_compass_calibrating = false;
+      if (s_calib_timeout) { app_timer_cancel(s_calib_timeout); s_calib_timeout = NULL; }
+      layer_mark_dirty(s_canvas_compass_icon);
     }
+  } else if (heading_data.compass_status == CompassStatusCalibrating ||
+             heading_data.compass_status == CompassStatusDataInvalid) {
+    if (!s_compass_calibrating) {
+      s_compass_calibrating = true;
+      if (s_calib_timeout) {
+        app_timer_cancel(s_calib_timeout);
+      }
+      s_calib_timeout = app_timer_register(10000, calib_timeout_cb, NULL);
+    }
+    // keep last heading until calibration completes
     layer_mark_dirty(s_canvas_compass_icon);
+    layer_mark_dirty(s_canvas_layer);
+    return;
+  } else {
+    // Unavailable or unknown state: keep current heading, show calibration state if applicable
+    s_compass_calibrating = heading_data.compass_status != CompassStatusCalibrated;
+    layer_mark_dirty(s_canvas_compass_icon);
+    layer_mark_dirty(s_canvas_layer);
+    return;
   }
 
   layer_mark_dirty(s_canvas_layer);
