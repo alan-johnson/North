@@ -39,6 +39,9 @@ static int s_heading;
 static ClaySettings settings;
 static bool showSeconds;
 static bool s_compass_enabled = true;
+static AppTimer *s_compass_toggle_timer = NULL;
+static bool s_compass_toggle_locked = false;
+static void compass_toggle_unlock(void *context);
 
 // Position/rendering config struct for different platforms
 typedef struct {
@@ -311,14 +314,24 @@ static void accel_tap_handler(AccelAxisType axis, int32_t direction) {
    // Wrist flick toggle: treat taps on any axis as compass on/off toggles
    APP_LOG(APP_LOG_LEVEL_DEBUG, "accel_tap: axis=%d dir=%ld", (int)axis, (long)direction);
    if (axis == ACCEL_AXIS_Y || axis == ACCEL_AXIS_X || axis == ACCEL_AXIS_Z) {
+     if (s_compass_toggle_locked) {
+       APP_LOG(APP_LOG_LEVEL_DEBUG, "compass toggle ignored: locked");
+       return;
+     }
      set_compass_enabled(!s_compass_enabled);
+     // debounce further toggles for a short period
+     if (s_compass_toggle_timer) {
+       app_timer_cancel(s_compass_toggle_timer);
+       s_compass_toggle_timer = NULL;
+     }
+     s_compass_toggle_locked = true;
+     s_compass_toggle_timer = app_timer_register(600, compass_toggle_unlock, NULL);
      // optional haptic feedback when toggling
      if (settings.VibeOn && !quiet_time_is_active()) {
        vibes_short_pulse();
      }
      return;
    }
-
   // Fallback: handle seconds-show/reset behavior on other axes as before
   if (settings.EnableSecondsHand && settings.SecondsVisibleTime < 135) {
       if (s_timeout_timer) {
@@ -333,6 +346,11 @@ static void accel_tap_handler(AccelAxisType axis, int32_t direction) {
       s_timeout_timer = app_timer_register(SECONDS_TICK_INTERVAL_MS * settings.SecondsVisibleTime, timeout_handler, NULL);
       layer_mark_dirty(s_canvas_second_hand);
   }
+}
+
+static void compass_toggle_unlock(void *context) {
+  s_compass_toggle_locked = false;
+  s_compass_toggle_timer = NULL;
 }
 
 static void bluetooth_vibe_icon (bool connected) {
