@@ -45,6 +45,8 @@
       "BackgroundColor1",
       "ShadowColor",
       "TextColor1",
+      "TickColor",
+      "BTQTColor",
       "MajorTickColor",
       "MinorTickColor",
       "TextColor3",
@@ -153,6 +155,11 @@
           "name": "DIN_CONDENSED_FFONT",
           "file": "data/DINPro-CondensedMedium.ffont",
           "targetPlatforms": [
+              "aplite",
+              "basalt",
+              "chalk",
+              "diorite",
+              "flint",
               "gabbro",
               "emery"
             ],

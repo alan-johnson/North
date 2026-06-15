@@ -34,6 +34,7 @@ static int s_hours;
 static int minutes;
 static int hours;
 static int seconds;
+static int s_heading;
 static ClaySettings settings;
 static bool showSeconds;
 
@@ -213,8 +214,7 @@ static void hour_min_hands_canvas_update_proc(Layer *layer, GContext *ctx);
 static void layer_update_proc_qt(Layer *layer, GContext *ctx);
 static void layer_update_proc_bt(Layer *layer, GContext *ctx);
 static void draw_fancy_hand_hour(GContext *ctx, int angle, int length, GColor fill_color, GColor border_color);
-static void draw_fancy_hand_min(GContext *ctx, int angle, int length, int back_length, GColor fill_color, GColor border_color);
-static void draw_seconds_line_hand(GContext *ctx, int angle, int length, int back_length, GColor color);
+static void compass_heading_handler(CompassHeadingData heading_data);
 #if PBL_COLOR
 static void draw_center_shadow(GContext *ctx, GColor shadow_color);
 #endif
@@ -892,58 +892,6 @@ static void draw_fancy_hand_hour(GContext *ctx, int angle, int length, GColor fi
 
 }
 
-static void draw_fancy_hand_min(GContext *ctx, int angle, int length, int back_length, GColor fill_color, GColor border_color) {
-    GPoint origin = GPoint(bounds.size.w / 2, bounds.size.h / 2);
-    int p1l = back_length;
-    int p2l = length;
-    GPoint p1 = polar_to_point_offset(origin, angle, p1l);
-    GPoint p2 = polar_to_point_offset(origin, angle, p2l);
-    graphics_context_set_antialiased(ctx, true);
-
-    #if PBL_COLOR
-    // Define shadow color
-    GColor shadow_color = settings.ShadowColor;
-
-    // Draw the shadow first, with an offset
-    GPoint shadow_offset = PBL_IF_BW_ELSE(GPoint(1,1),GPoint(2, 2));
-    graphics_context_set_stroke_color(ctx, shadow_color);
-    graphics_context_set_stroke_width(ctx, 7);
-    graphics_draw_line(ctx, GPoint(p1.x + shadow_offset.x, p1.y + shadow_offset.y), GPoint(p2.x + shadow_offset.x, p2.y + shadow_offset.y));
-    #endif
-
-    // Now draw the main hand on top
-    graphics_context_set_stroke_color(ctx, border_color);
-    graphics_context_set_stroke_width(ctx, 7);
-    //graphics_draw_line(ctx, origin, p1);
-    graphics_draw_line(ctx, p1, p2);
-    graphics_context_set_stroke_color(ctx, fill_color);
-    graphics_context_set_stroke_width(ctx, 3); //was 3
-    graphics_draw_line(ctx, p1, p2);
-}
-
-///second hand
-static void draw_seconds_line_hand(GContext *ctx, int angle, int length, int back_length, GColor color) {
-  GPoint origin = GPoint(bounds.size.w / 2, bounds.size.h / 2);
-  GPoint p1 = polar_to_point_offset(origin, angle, back_length);
-  GPoint p2 = polar_to_point_offset(origin, angle, length);
-  graphics_context_set_antialiased(ctx, true);
-
-  #if PBL_COLOR
-  // Define shadow color
-  GColor shadow_color = settings.ShadowColor;
-  // Draw the shadow first, with a small offset
-  graphics_context_set_stroke_color(ctx, shadow_color);
-  graphics_context_set_stroke_width(ctx, 2); // Same width as the hand
-  graphics_draw_line(ctx, GPoint(p1.x + 2, p1.y + 2 ), GPoint(p2.x + 2, p2.y + 2 ));
-  #endif
-
-  // Now draw the main second hand on top
-  graphics_context_set_stroke_color(ctx, color);
-  graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_line(ctx, p1, p2);
-
-}
-
 #if PBL_COLOR
 static void draw_center_shadow(GContext *ctx, GColor shadow_color) {
   GPoint origin = GPoint(bounds.size.w / 2, bounds.size.h / 2);
@@ -992,27 +940,15 @@ static void draw_minor_tick(GContext *ctx, GPoint center, GColor border_color) {
   graphics_fill_circle(ctx, center, 1);  // radius 2 = small dot
 }
 
+static void compass_heading_handler(CompassHeadingData heading_data) {
+  s_heading = (int)(heading_data.magnetic_heading + 0.5);
+  layer_mark_dirty(s_canvas_layer);
+}
+
 // Update procedure for the seconds hand layer
 static void layer_update_proc_seconds_hand(Layer *layer, GContext *ctx) {
-  if (!showSeconds || !prv_tick_time) {
-      // Do not draw the second hand if it should be hidden or if time data is not yet available
-      return;
-    }
-
-  GRect bounds = layer_get_bounds(layer);
-  seconds = prv_tick_time->tm_sec;
-  //for test & screenshots
-  //int
-  // seconds = 8;
-
-  if (!settings.EnableSecondsHand || !showSeconds) {
-    seconds = 0;
-  }
-
-  int seconds_angle = ((double)seconds / 60 * 360) - 90;
-
-  draw_seconds_line_hand(ctx, seconds_angle, bounds.size.w/2 - config.second_hand_a, bounds.size.w/2 - config.second_hand_b,  settings.SecondsHandColor);
- 
+  // Seconds hand graphics are removed in this redesign.
+  return;
 }
 
 //Update procedure for the Bluetooth Icon (shows when disconnected) layer
@@ -1084,28 +1020,9 @@ static void hour_min_hands_canvas_update_proc(Layer *layer, GContext *ctx) {
         draw_center_shadow(ctx, settings.ShadowColor);
       #endif
 
-//use these for live version
+  int heading_angle = s_heading - 90;
+  draw_fancy_hand_hour(ctx, heading_angle, bounds.size.w / 2 - config.hour_hand_a, settings.HoursHandColor, settings.HoursHandBorderColor);
 
-   minutes = prv_tick_time->tm_min;
-   hours = prv_tick_time->tm_hour % 12;
-
-  #ifdef HOUR
-    hours = HOUR;
-  #endif
-
-  #ifdef MINUTE
-    minutes = MINUTE;
-  #endif
-
-   int hours_angle = ((double)hours / 12 * 360) + ((double)minutes / 60 * 360 / 12) + /*((double)seconds / 60 * 360 / 60 / 12)*/  - 90;
-
-  draw_fancy_hand_hour(ctx, hours_angle, bounds.size.w / 2 - config.hour_hand_a, settings.HoursHandColor, settings.HoursHandBorderColor);
-
-   int minutes_angle = ((double)minutes / 60 * 360) + /*((double)seconds / 60 * 360 / 60)*/ - 90;
-
-   draw_fancy_hand_min(ctx, minutes_angle, bounds.size.w / 2 - config.min_hand_a, bounds.size.w / 2 - config.min_hand_b, settings.MinutesHandColor, settings.MinutesHandBorderColor);
-
-  
 }
 
 static void fg_update_proc (Layer *layer,GContext *ctx) {
@@ -1347,28 +1264,23 @@ static void prv_window_load(Window *window) {
   bounds_seconds = layer_get_bounds(seconds_root_layer);
 
   // Load fctx ffonts
-    FCTX_Font =  ffont_create_from_resource(RESOURCE_ID_DIN_CONDENSED_FFONT);
-    
+  FCTX_Font = ffont_create_from_resource(RESOURCE_ID_DIN_CONDENSED_FFONT);
+
+  #if defined(PBL_PLATFORM_EMERY) || defined(PBL_PLATFORM_GABBRO)
     FontBTQTIcons = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DRIPICONS_16));
+  #else
+    FontBTQTIcons = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DRIPICONS_12));
+  #endif
 
   connection_service_subscribe((ConnectionHandlers){
     .pebble_app_connection_handler = bluetooth_vibe_icon
   });
 
-  // Subscribe to the correct tick service based on settings
-    if (settings.EnableSecondsHand) {
-        if (settings.SecondsVisibleTime == 135) {
-        tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
-        } else {
-        tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
-        s_timeout_timer = app_timer_register(1000*settings.SecondsVisibleTime, timeout_handler,NULL);
-        accel_tap_service_subscribe(accel_tap_handler);
-        }
-    }
-    else {
-    tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
-    }
-    showSeconds = settings.EnableSecondsHand;
+  s_heading = 0;
+
+  // Subscribe to the correct tick service based on the redesigned face.
+  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
+  showSeconds = false;
 
   //create layers
   s_bg_layer = layer_create(bounds);
@@ -1380,6 +1292,7 @@ static void prv_window_load(Window *window) {
     layer_set_hidden(s_canvas_bt_icon, is_connected);
   s_canvas_layer = layer_create(bounds);
   s_fg_layer = layer_create(bounds);
+  layer_set_hidden(s_canvas_second_hand, true);
 
   // Change the order here
   layer_add_child(window_layer, s_bg_layer); //backforound, circles, major tick shoadow &tickmask
@@ -1398,6 +1311,7 @@ static void prv_window_load(Window *window) {
   layer_set_update_proc(s_canvas_qt_icon, layer_update_proc_qt);
   layer_set_update_proc(s_canvas_layer, hour_min_hands_canvas_update_proc);
   layer_set_update_proc(s_fg_layer, fg_update_proc);
+  compass_service_subscribe(compass_heading_handler);
   
 
 
@@ -1410,6 +1324,7 @@ static void prv_window_unload(Window *window) {
   }
   accel_tap_service_unsubscribe();
   connection_service_unsubscribe();
+  compass_service_unsubscribe();
   battery_state_service_unsubscribe();
   tick_timer_service_unsubscribe();
   layer_destroy(s_canvas_layer);
