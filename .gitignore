@@ -1,0 +1,58 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+.TemporaryItems
+.Trashes
+.Spotlight-V100
+.fseventsd
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Node.js / package artifacts
+node_modules/
+pm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build artifacts
+build/
+dist/
+out/
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+*.log
+
+# Waf / wscript build artifacts
+*.pyc
+*.pyo
+*.pyd
+*.tmp
+*.swp
+
+# Editor temp files
+*~
+*.swp
+*.swo
+*.tmp
+*.bak
+*.orig
+
+# Misc
+.DS_Store?
+Thumbs.db
+*.class
+coverage/
+.git-corrupt-backup/
