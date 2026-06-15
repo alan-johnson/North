@@ -37,6 +37,7 @@ static int seconds;
 static int s_heading;
 static ClaySettings settings;
 static bool showSeconds;
+static bool s_compass_enabled = true;
 
 // Position/rendering config struct for different platforms
 typedef struct {
@@ -287,28 +288,45 @@ static void timeout_handler(void *context) {
 
 }
 
+static void set_compass_enabled(bool enabled) {
+  if (s_compass_enabled == enabled) return;
+  s_compass_enabled = enabled;
+  if (enabled) {
+    compass_service_subscribe(compass_heading_handler);
+  } else {
+    compass_service_unsubscribe();
+    s_heading = 0; // force pointer to default (north)
+  }
+  layer_mark_dirty(s_canvas_layer);
+}
+
 static void accel_tap_handler(AccelAxisType axis, int32_t direction) {
    if (ignore_next_tap) {
-       ignore_next_tap = false; // Reset the flag for the next tap
+       ignore_next_tap = false;
        return;
-     }
+   }
 
-  // Only handle if the seconds hand setting is enabled and not already always on
+   // Wrist flick toggle: treat Y-axis taps as compass on/off toggles
+   if (axis == ACCEL_AXIS_Y) {
+     set_compass_enabled(!s_compass_enabled);
+     // optional haptic feedback when toggling
+     if (settings.VibeOn && !quiet_time_is_active()) {
+       vibes_short_pulse();
+     }
+     return;
+   }
+
+  // Fallback: handle seconds-show/reset behavior on other axes as before
   if (settings.EnableSecondsHand && settings.SecondsVisibleTime < 135) {
-      // If a timer is already running, cancel it
       if (s_timeout_timer) {
         app_timer_cancel(s_timeout_timer);
         s_timeout_timer = NULL;
       }
 
-      // Only subscribe to second ticks if not already subscribed
       if (!showSeconds) {
          tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
       }
-      
       showSeconds = true;
-
-      // Register a new timer to hide the seconds hand
       s_timeout_timer = app_timer_register(SECONDS_TICK_INTERVAL_MS * settings.SecondsVisibleTime, timeout_handler, NULL);
       layer_mark_dirty(s_canvas_second_hand);
   }
@@ -321,8 +339,7 @@ static void bluetooth_vibe_icon (bool connected) {
 
   if((!connected && !quiet_time_is_active()) ||(!connected && quiet_time_is_active() && settings.VibeOn)) {
     if (settings.SecondsVisibleTime > 0 && settings.SecondsVisibleTime < 135) {
-      // Unsubscribe from accel_tap before the vibe
-      accel_tap_service_unsubscribe();
+      // Keep accel tap subscribed (we use Y-axis flick for compass toggle).
       showSeconds = false;
     }
 
@@ -431,7 +448,6 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     settings.EnableSecondsHand = enable_seconds_t->value->int32 == 1;
     // Unsubscribe from any existing tick services
     tick_timer_service_unsubscribe();
-    accel_tap_service_unsubscribe();
     // Always subscribe to MINUTE_UNIT by default for efficiency
     tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
     layer_mark_dirty(s_canvas_second_hand);
@@ -492,8 +508,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
       if (settings.EnableSecondsHand) {
         tick_timer_service_unsubscribe();
         tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
-        // Unsubscribe from accel_tap_service as it's not needed
-        accel_tap_service_unsubscribe();
+        // Keep accel tap subscribed (compass toggle stays available)
       }
     } else if (settings.SecondsVisibleTime > 0) {
       // "Timeout" logic: start with seconds shown, register a timer
@@ -502,16 +517,14 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
         tick_timer_service_unsubscribe();
         tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
         s_timeout_timer = app_timer_register(SECONDS_TICK_INTERVAL_MS * settings.SecondsVisibleTime, timeout_handler, NULL);
-        // Subscribe to accel_tap_service to reset the timer
-        accel_tap_service_subscribe(accel_tap_handler);
+        // accel tap remains subscribed globally; seconds reset will be handled by the tap handler
       }
     } else {
       // "Disabled" logic: don't show seconds, ensure on minute ticks
       showSeconds = false;
       tick_timer_service_unsubscribe();
       tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
-      // Unsubscribe from accel_tap_service
-      accel_tap_service_unsubscribe();
+      // accel tap remains subscribed globally; no unsubscribe here
     }
     layer_mark_dirty(s_canvas_second_hand);
   }
@@ -1020,7 +1033,7 @@ static void hour_min_hands_canvas_update_proc(Layer *layer, GContext *ctx) {
         draw_center_shadow(ctx, settings.ShadowColor);
       #endif
 
-  int heading_angle = s_heading - 90;
+  int heading_angle = s_compass_enabled ? (s_heading - 90) : -90;
   draw_fancy_hand_hour(ctx, heading_angle, bounds.size.w / 2 - config.hour_hand_a, settings.HoursHandColor, settings.HoursHandBorderColor);
 
 }
@@ -1311,7 +1324,11 @@ static void prv_window_load(Window *window) {
   layer_set_update_proc(s_canvas_qt_icon, layer_update_proc_qt);
   layer_set_update_proc(s_canvas_layer, hour_min_hands_canvas_update_proc);
   layer_set_update_proc(s_fg_layer, fg_update_proc);
-  compass_service_subscribe(compass_heading_handler);
+  // enable accel tap handler for wrist-flick toggles
+  accel_tap_service_subscribe(accel_tap_handler);
+
+  // enable compass by default
+  set_compass_enabled(true);
   
 
 
