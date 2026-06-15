@@ -1217,7 +1217,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     if (settings.EnableLogo && logotext_t && strlen(logotext_t->value->cstring) > 0) {
       snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", logotext_t->value->cstring);
     } else if (settings.EnableLogo) {
-      snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", "HYBRID");
+      snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", "NORTH");
     } else {
       snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", "");
     }
@@ -1892,7 +1892,7 @@ static void weather2_update_proc(Layer *layer, GContext *ctx) {
       // Round foreground (North style)
       draw_center(ctx, settings.SecondsHandColor, settings.FGColor);
     } else {
-      // Rect foreground (HybridToo style)
+      // Rect foreground (NorthToo style)
       GRect fg_rect = GRect(config.foregroundrect_x, config.foregroundrect_y,
                             config.foregroundrect_w, config.foregroundrect_h);
       graphics_context_set_antialiased(ctx, true);

@@ -238,7 +238,7 @@ static void prv_default_settings(void) {
   settings.EnableBattery = true;
   settings.EnableBatteryLine = true;
   settings.EnableLogo = true;
-  snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", "HYBRID");
+  snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", "NORTH");
   settings.BackgroundColor1 = GColorWhite;
   #if PBL_COLOR
   settings.ShadowColor = GColorLightGray;
@@ -462,7 +462,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
       snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", logotext_t->value->cstring);
     } else if (settings.EnableLogo && strlen(logotext_t->value->cstring) == 0) {
       // If the custom text field is blank but the logo is enabled, use the default text
-      snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", "HYBRID");
+      snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", "NORTH");
     }
     else {
       snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", "");

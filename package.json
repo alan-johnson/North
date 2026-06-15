@@ -1,11 +1,12 @@
 {
-  "name": "HybridWeather",
-  "author": "astosia",
-  "version": "3.0.0",
+  "name": "NorthWeather",
+  "author": "Alan Johnson",
+  "version": "1.0.0",
   "keywords": [
     "analog",
     "analogue",
-    "hybrid",
+    "north",
+    "compass",
     "ksana"
   ],
   "private": true,
