@@ -308,8 +308,9 @@ static void accel_tap_handler(AccelAxisType axis, int32_t direction) {
        return;
    }
 
-   // Wrist flick toggle: treat Y-axis taps as compass on/off toggles
-   if (axis == ACCEL_AXIS_Y) {
+   // Wrist flick toggle: treat taps on any axis as compass on/off toggles
+   APP_LOG(APP_LOG_LEVEL_DEBUG, "accel_tap: axis=%d dir=%ld", (int)axis, (long)direction);
+   if (axis == ACCEL_AXIS_Y || axis == ACCEL_AXIS_X || axis == ACCEL_AXIS_Z) {
      set_compass_enabled(!s_compass_enabled);
      // optional haptic feedback when toggling
      if (settings.VibeOn && !quiet_time_is_active()) {
