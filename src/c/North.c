@@ -17,6 +17,7 @@ static Layer *s_bg_layer;
 static Layer *s_canvas_second_hand;
 static Layer *s_canvas_bt_icon;
 static Layer *s_canvas_qt_icon;
+static Layer *s_canvas_compass_icon;
 static Layer *s_fg_layer;
 static GRect bounds;
 static GRect bounds_seconds;
@@ -213,6 +214,7 @@ static void fg_update_proc(Layer *layer, GContext *ctx);
 static void layer_update_proc_seconds_hand(Layer *layer, GContext * ctx);
 static void hour_min_hands_canvas_update_proc(Layer *layer, GContext *ctx);
 static void layer_update_proc_qt(Layer *layer, GContext *ctx);
+static void layer_update_proc_compass_icon(Layer *layer, GContext *ctx);
 static void layer_update_proc_bt(Layer *layer, GContext *ctx);
 static void draw_fancy_hand_hour(GContext *ctx, int angle, int length, GColor fill_color, GColor border_color);
 static void compass_heading_handler(CompassHeadingData heading_data);
@@ -945,6 +947,27 @@ static void draw_major_tick (GContext *ctx, int angle, int length, GColor fill_c
 
 }
 
+static void layer_update_proc_compass_icon(Layer *layer, GContext *ctx) {
+  // Draw a small ring + slash when compass is disabled
+  if (s_compass_enabled) return;
+
+  GRect bounds = layer_get_bounds(layer);
+  GPoint center = GPoint(bounds.size.w - 18, 18);
+
+  // Outer ring
+  graphics_context_set_fill_color(ctx, settings.TickColor);
+  graphics_fill_circle(ctx, center, 9);
+
+  // Inner circle to create ring effect
+  graphics_context_set_fill_color(ctx, settings.FGColor);
+  graphics_fill_circle(ctx, center, 7);
+
+  // Slash line across the ring
+  graphics_context_set_stroke_color(ctx, settings.TickColor);
+  graphics_context_set_stroke_width(ctx, 2);
+  graphics_draw_line(ctx, GPoint(center.x - 5, center.y - 5), GPoint(center.x + 5, center.y + 5));
+}
+
 
 static void draw_minor_tick(GContext *ctx, GPoint center, GColor border_color) {
  
@@ -1307,6 +1330,8 @@ static void prv_window_load(Window *window) {
   s_fg_layer = layer_create(bounds);
   layer_set_hidden(s_canvas_second_hand, true);
 
+  s_canvas_compass_icon = layer_create(bounds);
+
   // Change the order here
   layer_add_child(window_layer, s_bg_layer); //backforound, circles, major tick shoadow &tickmask
   layer_add_child(window_layer, s_canvas_layer);  //hour and minute hands
@@ -1314,6 +1339,7 @@ static void prv_window_load(Window *window) {
   layer_add_child(window_layer, s_fg_layer); //digital content layer on top
   layer_add_child(window_layer, s_canvas_bt_icon);
   layer_add_child(window_layer, s_canvas_qt_icon);
+  layer_add_child(window_layer, s_canvas_compass_icon);
   
 
   bluetooth_vibe_icon(connection_service_peek_pebble_app_connection());
@@ -1324,6 +1350,7 @@ static void prv_window_load(Window *window) {
   layer_set_update_proc(s_canvas_qt_icon, layer_update_proc_qt);
   layer_set_update_proc(s_canvas_layer, hour_min_hands_canvas_update_proc);
   layer_set_update_proc(s_fg_layer, fg_update_proc);
+  layer_set_update_proc(s_canvas_compass_icon, layer_update_proc_compass_icon);
   // enable accel tap handler for wrist-flick toggles
   accel_tap_service_subscribe(accel_tap_handler);
 
@@ -1350,6 +1377,7 @@ static void prv_window_unload(Window *window) {
   layer_destroy(s_canvas_second_hand);
   layer_destroy(s_canvas_bt_icon);
   layer_destroy(s_canvas_qt_icon);
+  layer_destroy(s_canvas_compass_icon);
   ffont_destroy(FCTX_Font);
   fonts_unload_custom_font(FontBTQTIcons);
 }
