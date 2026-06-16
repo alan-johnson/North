@@ -720,7 +720,7 @@ static void prv_default_settings(void) {
   settings.EnableBattery = true;
   settings.EnableBatteryLine = true;
   settings.EnableLogo = true;
-  snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", "HYBRID");
+  snprintf(settings.LogoText, sizeof(settings.LogoText), "%s", "NORTH");
   settings.BackgroundColor1 = GColorWhite;
   #if PBL_COLOR
   settings.ShadowColor = GColorLightGray;
@@ -1780,7 +1780,7 @@ static void weather_update_proc(Layer *layer, GContext *ctx) {
       // Round foreground (North style)
       draw_center(ctx, settings.SecondsHandColor, settings.FGColor);
     } else {
-      // Rect foreground (HybridToo style)
+      // Rect foreground (NorthToo style)
       GRect fg_rect = GRect(config.foregroundrect_x, config.foregroundrect_y,
                             config.foregroundrect_w, config.foregroundrect_h);
       graphics_context_set_antialiased(ctx, true);
@@ -2129,7 +2129,7 @@ static void fg_update_proc(Layer *layer, GContext *ctx) {
       // Round foreground (North style)
       draw_center(ctx, settings.SecondsHandColor, settings.FGColor);
     } else {
-      // Rect foreground (HybridToo style)
+      // Rect foreground (NorthToo style)
       GRect fg_rect = GRect(config.foregroundrect_x, config.foregroundrect_y,
                             config.foregroundrect_w, config.foregroundrect_h);
       graphics_context_set_antialiased(ctx, true);
@@ -2354,7 +2354,7 @@ static void fg_update_proc(Layer *layer, GContext *ctx) {
       // Round foreground (North style)
       draw_center(ctx, settings.SecondsHandColor, settings.FGColor);
     } else {
-      // Rect foreground (HybridToo style)
+      // Rect foreground (NorthToo style)
       GRect fg_rect = GRect(config.foregroundrect_x, config.foregroundrect_y,
                             config.foregroundrect_w, config.foregroundrect_h);
       graphics_context_set_antialiased(ctx, true);

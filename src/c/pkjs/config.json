@@ -54,11 +54,11 @@
       {
          "type": "input",
          "messageKey": "LogoText",
-         "defaultValue": "HYBRID",
+         "defaultValue": "NORTH",
          "label": "Custom Text",
          "description": "Maximum 6 characters",
          "attributes": {
-           "placeholder": "HYBRID"
+           "placeholder": "NORTH"
          }
       },
       {

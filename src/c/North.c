@@ -43,6 +43,7 @@ static AppTimer *s_compass_toggle_timer = NULL;
 static bool s_compass_toggle_locked = false;
 static void compass_toggle_unlock(void *context);
 static bool s_compass_calibrating = false;
+static bool s_has_calibrated_heading = false;
 static AppTimer *s_calib_timeout = NULL;
 static void calib_timeout_cb(void *context);
 
@@ -302,6 +303,7 @@ static void set_compass_enabled(bool enabled) {
   if (enabled) {
     compass_service_subscribe(compass_heading_handler);
     s_compass_calibrating = true;
+    s_has_calibrated_heading = false;
     if (s_calib_timeout) {
       app_timer_cancel(s_calib_timeout);
     }
@@ -310,6 +312,7 @@ static void set_compass_enabled(bool enabled) {
     compass_service_unsubscribe();
     s_heading = 0; // force pointer to default (north)
     s_compass_calibrating = false;
+    s_has_calibrated_heading = false;
     if (s_calib_timeout) { app_timer_cancel(s_calib_timeout); s_calib_timeout = NULL; }
   }
   layer_mark_dirty(s_canvas_layer);
@@ -1023,16 +1026,27 @@ static void draw_minor_tick(GContext *ctx, GPoint center, GColor border_color) {
 }
 
 static void compass_heading_handler(CompassHeadingData heading_data) {
+  bool should_dirty_layer = false;
+
   if (heading_data.compass_status == CompassStatusCalibrated) {
-    int new_heading = (int)(heading_data.magnetic_heading + 0.5);
-    s_heading = new_heading;
+    int raw_deg = (int)(heading_data.magnetic_heading * 360 / TRIG_MAX_ANGLE);
+    int delta = raw_deg - s_heading;
+    while (delta > 180) delta -= 360;
+    while (delta < -180) delta += 360;
+    s_heading += delta / 4;
+    while (s_heading < 0) s_heading += 360;
+    while (s_heading >= 360) s_heading -= 360;
+    s_has_calibrated_heading = true;
+    should_dirty_layer = true;
+
     if (s_compass_calibrating) {
       s_compass_calibrating = false;
-      if (s_calib_timeout) { app_timer_cancel(s_calib_timeout); s_calib_timeout = NULL; }
-      layer_mark_dirty(s_canvas_compass_icon);
+      if (s_calib_timeout) {
+        app_timer_cancel(s_calib_timeout);
+        s_calib_timeout = NULL;
+      }
     }
-  } else if (heading_data.compass_status == CompassStatusCalibrating ||
-             heading_data.compass_status == CompassStatusDataInvalid) {
+  } else if (heading_data.compass_status == CompassStatusCalibrating) {
     if (!s_compass_calibrating) {
       s_compass_calibrating = true;
       if (s_calib_timeout) {
@@ -1040,19 +1054,22 @@ static void compass_heading_handler(CompassHeadingData heading_data) {
       }
       s_calib_timeout = app_timer_register(10000, calib_timeout_cb, NULL);
     }
-    // keep last heading until calibration completes
-    layer_mark_dirty(s_canvas_compass_icon);
-    layer_mark_dirty(s_canvas_layer);
-    return;
+  } else if (heading_data.compass_status == CompassStatusDataInvalid) {
+    if (!s_compass_calibrating) {
+      s_compass_calibrating = true;
+      if (s_calib_timeout) {
+        app_timer_cancel(s_calib_timeout);
+      }
+      s_calib_timeout = app_timer_register(10000, calib_timeout_cb, NULL);
+    }
   } else {
-    // Unavailable or unknown state: keep current heading, show calibration state if applicable
     s_compass_calibrating = heading_data.compass_status != CompassStatusCalibrated;
-    layer_mark_dirty(s_canvas_compass_icon);
-    layer_mark_dirty(s_canvas_layer);
-    return;
   }
 
-  layer_mark_dirty(s_canvas_layer);
+  layer_mark_dirty(s_canvas_compass_icon);
+  if (should_dirty_layer) {
+    layer_mark_dirty(s_canvas_layer);
+  }
 }
 
 // Update procedure for the seconds hand layer
